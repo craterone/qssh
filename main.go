@@ -191,7 +191,6 @@ func findHost(configFilePath, server string) *Host {
 
 func connectCommand(configFilePath, server string) {
 	//server := os.Args[2]
-
 	host := findHost(configFilePath, server)
 
 	if host != nil {
@@ -210,7 +209,7 @@ func getConfigLine(configFilePath string) []string {
 	buf, _ := ioutil.ReadAll(f)
 	configsStr := string(buf)
 	//fmt.Printf(configsStr)
-	lines := strings.Split(configsStr, "\r\n")
+	lines := strings.Split(configsStr, "\n")
 	lines = lines[0 : len(lines)-1]
 	return lines
 }
