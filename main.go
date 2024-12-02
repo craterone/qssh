@@ -7,12 +7,15 @@ import (
 	"os"
 	"os/exec"
 	sysUser "os/user"
+	"path/filepath"
 	"strconv"
 	"strings"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/term"
 )
+
+var logger = log.Default()
 
 //const (
 //	APP_NAME        = "qssh"
@@ -29,6 +32,10 @@ type Host struct {
 	IP       string
 	Username string
 	Port     int
+}
+
+func (h *Host) getAddress() string {
+	return fmt.Sprintf("%s@%s", h.Username, h.IP)
 }
 
 func connect2(user, host string, port int) (*ssh.Session, error) {
@@ -156,6 +163,7 @@ func findHost(configFilePath, server string) *Host {
 			}
 		}
 	}
+	log.Fatalf("Host %s not existed!", server)
 	return nil
 }
 
@@ -166,7 +174,7 @@ func connectCommand(configFilePath, server string) {
 	if host != nil {
 		sshConnect(host)
 	} else {
-		fmt.Printf("Unknown host %s \r\n", server)
+		logger.Fatalf("Unknown host %s \n", server)
 	}
 
 	//f.WriteString(line+"\r\n")
@@ -185,13 +193,33 @@ func getConfigLine(configFilePath string) []string {
 }
 
 func copyToRemote(host *Host, localFile, remoteFile string) {
-	remote := fmt.Sprintf("%s@%s:%s", host.Username, host.IP, remoteFile)
-	log.Default().Println(remote)
-	cmd := exec.Command("scp", "-P", strconv.Itoa(host.Port), localFile, remote)
+	logger.Println("CopyToRemote")
+
+	remote := fmt.Sprintf("%s:%s", host.getAddress(), remoteFile)
+	logger.Println(remote)
+	cmd := exec.Command("scp", "-P", strconv.Itoa(host.Port), "-r", localFile, remote)
 	_, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Fatalf("cmd.Run() failed with %s\n", err)
 	}
+}
+
+func backupRemote(host *Host, remoteFile string) bool {
+	logger.Println("BackupRemote")
+
+	remoteDir := filepath.Dir(remoteFile)
+	remoteFolder := filepath.Base(remoteFile)
+
+	// Build the backup and remove command
+	backupCmd := fmt.Sprintf("cd %s && zip -r %s_$(date +%%Y-%%m-%%d~%%H-%%M-%%S).zip %s && rm -rf %s", remoteDir, remoteFolder, remoteFolder, remoteFolder)
+	sshBackupCmd := fmt.Sprintf("ssh %s -p %d \"%s\"", host.getAddress(), host.Port, backupCmd)
+
+	err := exec.Command("bash", "-c", sshBackupCmd).Run()
+	if err != nil {
+		log.Fatalf("Failed to execute SSH command: %v", err)
+		return false
+	}
+	return true
 }
 
 func main() {
@@ -201,7 +229,7 @@ func main() {
 	}
 
 	configFilePath := fmt.Sprintf("%s/%s", usr.HomeDir, ".qssh")
-	fmt.Printf("config path: %s\n", configFilePath)
+	logger.Printf("Config path: %s\n", configFilePath)
 	if len(os.Args) < 2 {
 		fmt.Print("add, connect, list, copy")
 		return
@@ -225,7 +253,7 @@ func main() {
 	case "list":
 		lines := getConfigLine(configFilePath)
 		for _, e := range lines {
-			fmt.Printf("%s\r\n", e)
+			fmt.Println(e)
 		}
 	case "push":
 		//if len(os.Args) >= 2 {
@@ -244,9 +272,21 @@ func main() {
 			host := findHost(configFilePath, server)
 
 			if host != nil {
-
 				copyToRemote(host, localFile, "~")
-				//fmt.Printf("combined out:\n%s\n", string(out))
+			}
+		}
+	case "deploy":
+		if len(os.Args) >= 4 {
+			server := os.Args[2]
+			localFile := os.Args[3]
+			remoteFile := os.Args[4]
+			host := findHost(configFilePath, server)
+
+			if host != nil {
+				remotePath := fmt.Sprintf("/www/%s", remoteFile)
+				if backupRemote(host, remotePath) {
+					copyToRemote(host, localFile, remotePath)
+				}
 			}
 		}
 	default:
