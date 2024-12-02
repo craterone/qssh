@@ -184,6 +184,16 @@ func getConfigLine(configFilePath string) []string {
 	return lines
 }
 
+func copyToRemote(host *Host, localFile, remoteFile string) {
+	remote := fmt.Sprintf("%s@%s:%s", host.Username, host.IP, remoteFile)
+	log.Default().Println(remote)
+	cmd := exec.Command("scp", "-P", strconv.Itoa(host.Port), localFile, remote)
+	_, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Fatalf("cmd.Run() failed with %s\n", err)
+	}
+}
+
 func main() {
 	usr, err := sysUser.Current()
 	if err != nil {
@@ -230,18 +240,12 @@ func main() {
 	case "copy":
 		if len(os.Args) >= 3 {
 			server := os.Args[2]
-			thing := os.Args[3]
+			localFile := os.Args[3]
 			host := findHost(configFilePath, server)
 
 			if host != nil {
 
-				remote := fmt.Sprintf("%s@%s:~", host.Username, host.IP)
-				log.Default().Println(remote)
-				cmd := exec.Command("scp", "-P", strconv.Itoa(host.Port), thing, remote)
-				_, err := cmd.CombinedOutput()
-				if err != nil {
-					log.Fatalf("cmd.Run() failed with %s\n", err)
-				}
+				copyToRemote(host, localFile, "~")
 				//fmt.Printf("combined out:\n%s\n", string(out))
 			}
 		}
