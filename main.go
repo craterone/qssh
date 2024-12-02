@@ -266,13 +266,19 @@ func main() {
 		//	fmt.Printf("combined out:\n%s\n", string(out))
 		//}
 	case "copy":
-		if len(os.Args) >= 3 {
+		if len(os.Args) >= 4 {
 			server := os.Args[2]
 			localFile := os.Args[3]
-			host := findHost(configFilePath, server)
 
+			remoteFile := "~"
+
+			if len(os.Args) == 5 {
+				remoteFile = os.Args[4]
+			}
+
+			host := findHost(configFilePath, server)
 			if host != nil {
-				copyToRemote(host, localFile, "~")
+				copyToRemote(host, localFile, remoteFile)
 			}
 		}
 	case "deploy":
