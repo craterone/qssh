@@ -1,19 +1,17 @@
 package main
 
 import (
-	"bufio"
-	"errors"
 	"fmt"
-	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/terminal"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"os/exec"
 	sysUser "os/user"
-	"path/filepath"
 	"strconv"
 	"strings"
+
+	"golang.org/x/crypto/ssh"
+	"golang.org/x/term"
 )
 
 //const (
@@ -33,36 +31,6 @@ type Host struct {
 	Port     int
 }
 
-func getHostKey(host string) (ssh.PublicKey, error) {
-	file, err := os.Open(filepath.Join(os.Getenv("HOME"), ".ssh", "known_hosts"))
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	var hostKey ssh.PublicKey
-	for scanner.Scan() {
-		fields := strings.Split(scanner.Text(), " ")
-		if len(fields) != 3 {
-			continue
-		}
-		if strings.Contains(fields[0], host) {
-			var err error
-			hostKey, _, _, _, err = ssh.ParseAuthorizedKey(scanner.Bytes())
-			if err != nil {
-				return nil, errors.New(fmt.Sprintf("error parsing %q: %v", fields[2], err))
-			}
-			break
-		}
-	}
-
-	if hostKey == nil {
-		return nil, errors.New(fmt.Sprintf("no hostkey for %s", host))
-	}
-	return hostKey, nil
-}
-
 func connect2(user, host string, port int) (*ssh.Session, error) {
 	var (
 		//auth         []ssh.AuthMethod
@@ -72,18 +40,20 @@ func connect2(user, host string, port int) (*ssh.Session, error) {
 		err     error
 	)
 
-	//hostKey, err := getHostKey(host)
-	if err != nil {
-		log.Fatal(err)
-	} // A public key may be used to authenticate against the remote
+	// A public key may be used to authenticate against the remote
 	// server by using an unencrypted PEM-encoded private key file.
 	//
 	// If you have an encrypted private key, the crypto/x509 package
 	// can be used to decrypt it.
 	sUsr, err := sysUser.Current()
+
+	if err != nil {
+		log.Fatalf("unable to get user: %v", err)
+	}
+
 	configFilePath := fmt.Sprintf("%s/%s", sUsr.HomeDir, ".ssh/id_rsa")
 
-	key, err := ioutil.ReadFile(configFilePath)
+	key, err := os.ReadFile(configFilePath)
 	if err != nil {
 		log.Fatalf("unable to read private key: %v", err)
 	}
@@ -131,18 +101,18 @@ func sshConnect(h *Host) {
 	defer session.Close()
 
 	fd := int(os.Stdin.Fd())
-	oldState, err := terminal.MakeRaw(fd)
+	oldState, err := term.MakeRaw(fd)
 	if err != nil {
 		panic(err)
 	}
-	defer terminal.Restore(fd, oldState)
+	defer term.Restore(fd, oldState)
 
 	// excute command
 	session.Stdout = os.Stdout
 	session.Stderr = os.Stderr
 	session.Stdin = os.Stdin
 
-	termWidth, termHeight, err := terminal.GetSize(fd)
+	termWidth, termHeight, err := term.GetSize(fd)
 	if err != nil {
 		panic(err)
 	}
@@ -206,7 +176,7 @@ func connectCommand(configFilePath, server string) {
 func getConfigLine(configFilePath string) []string {
 	f, _ := os.OpenFile(configFilePath, os.O_RDONLY, 0644)
 	defer f.Close()
-	buf, _ := ioutil.ReadAll(f)
+	buf, _ := io.ReadAll(f)
 	configsStr := string(buf)
 	//fmt.Printf(configsStr)
 	lines := strings.Split(configsStr, "\n")
@@ -222,6 +192,11 @@ func main() {
 
 	configFilePath := fmt.Sprintf("%s/%s", usr.HomeDir, ".qssh")
 	fmt.Printf("config path: %s\n", configFilePath)
+	if len(os.Args) < 2 {
+		fmt.Print("add, connect, list, copy")
+		return
+	}
+
 	switch os.Args[1] {
 	// Register user
 	case "add":
@@ -261,7 +236,8 @@ func main() {
 			if host != nil {
 
 				remote := fmt.Sprintf("%s@%s:~", host.Username, host.IP)
-				cmd := exec.Command("scp", thing, remote)
+				log.Default().Println(remote)
+				cmd := exec.Command("scp", "-P", strconv.Itoa(host.Port), thing, remote)
 				_, err := cmd.CombinedOutput()
 				if err != nil {
 					log.Fatalf("cmd.Run() failed with %s\n", err)
