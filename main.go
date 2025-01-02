@@ -216,7 +216,7 @@ func backupRemote(host *Host, remoteFile string) bool {
 
 	err := exec.Command("bash", "-c", sshBackupCmd).Run()
 	if err != nil {
-		log.Fatalf("Failed to execute SSH command: %v", err)
+		log.Fatalf("Failed to execute SSH command: %s, %v", sshBackupCmd, err)
 		return false
 	}
 	return true
@@ -231,7 +231,7 @@ func main() {
 	configFilePath := fmt.Sprintf("%s/%s", usr.HomeDir, ".qssh")
 	logger.Printf("Config path: %s\n", configFilePath)
 	if len(os.Args) < 2 {
-		fmt.Print("add, connect, list, copy")
+		fmt.Println("add, connect, list, copy, deploy")
 		return
 	}
 
