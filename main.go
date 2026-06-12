@@ -196,11 +196,14 @@ func copyToRemote(host *Host, localFile, remoteFile string) {
 	logger.Println("CopyToRemote")
 
 	remote := fmt.Sprintf("%s:%s", host.getAddress(), remoteFile)
-	logger.Println(remote)
+	logOutput := []string{"scp", "-P", strconv.Itoa(host.Port), "-r", localFile, remote}
+	combinedOutput := strings.Join(logOutput, " ")
+	logger.Println(combinedOutput)
+
 	cmd := exec.Command("scp", "-P", strconv.Itoa(host.Port), "-r", localFile, remote)
-	_, err := cmd.CombinedOutput()
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Fatalf("cmd.Run() failed with %s\n", err)
+		log.Fatalf("CopyToRemote failed with %s,%s\n", output, err)
 	}
 }
 
@@ -214,9 +217,9 @@ func backupRemote(host *Host, remoteFile string) bool {
 	backupCmd := fmt.Sprintf("cd %s && zip -r %s_$(date +%%Y-%%m-%%d~%%H-%%M-%%S).zip %s && rm -rf %s", remoteDir, remoteFolder, remoteFolder, remoteFolder)
 	sshBackupCmd := fmt.Sprintf("ssh %s -p %d \"%s\"", host.getAddress(), host.Port, backupCmd)
 
-	err := exec.Command("bash", "-c", sshBackupCmd).Run()
+	output, err := exec.Command("bash", "-c", sshBackupCmd).CombinedOutput()
 	if err != nil {
-		log.Fatalf("Failed to execute SSH command: %s, %v", sshBackupCmd, err)
+		log.Fatalf("Failed to execute SSH command: %s, %v", output, err)
 		return false
 	}
 	return true
