@@ -225,6 +225,22 @@ func backupRemote(host *Host, remoteFile string) bool {
 	return true
 }
 
+// printHelp 打印帮助信息
+func printHelp() {
+	fmt.Println("Usage: qssh <command> [arguments]")
+	fmt.Println()
+	fmt.Println("Commands:")
+	fmt.Println("  add <alias> <user>@<ip>[:<port>]  Add a ssh host configuration")
+	fmt.Println("  connect <alias>                  Connect to a ssh host")
+	fmt.Println("  list                             List all configured hosts")
+	fmt.Println("  copy <alias> <local> [<remote>]  Copy files/directories to a remote host (using scp)")
+	fmt.Println("  deploy <alias> <local> <remote>  Backup remote target (as zip) and copy local file/dir there")
+	fmt.Println("  <alias>                          Connect to a ssh host directly")
+	fmt.Println()
+	fmt.Println("Flags:")
+	fmt.Println("  -h, --help                       Show this help message")
+}
+
 func main() {
 	usr, err := sysUser.Current()
 	if err != nil {
@@ -234,7 +250,7 @@ func main() {
 	configFilePath := fmt.Sprintf("%s/%s", usr.HomeDir, ".qssh")
 	logger.Printf("Config path: %s\n", configFilePath)
 	if len(os.Args) < 2 {
-		fmt.Println("add, connect, list, copy, deploy")
+		printHelp()
 		return
 	}
 
@@ -298,6 +314,8 @@ func main() {
 				}
 			}
 		}
+	case "-h", "--help", "help":
+		printHelp()
 	default:
 		if len(os.Args) >= 2 {
 			server := os.Args[1]
