@@ -136,7 +136,11 @@ func sshConnect(h *Host) {
 		log.Fatal(err)
 	}
 
-	session.Run("bash")
+	if err := session.Shell(); err != nil {
+		log.Fatal(err)
+	}
+
+	_ = session.Wait()
 }
 
 func findHost(configFilePath, server string) *Host {
